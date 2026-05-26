@@ -20,70 +20,41 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---------------- CUSTOM CSS ----------------
+# ---------------- CSS ----------------
 
 st.markdown("""
 <style>
-    .stApp {
-        background-color: #0f0f0f;
-        color: #f0f0f0;
-    }
+.stApp {
+    background-color: #0f0f0f;
+    color: white;
+}
 
-    h1, h2, h3 {
-        color: #00e5ff;
-    }
+h1,h2,h3 {
+    color: #00e5ff;
+}
 
-    .verified {
-        background-color: #0d3b1e;
-        border-left: 5px solid #00c853;
-        padding: 12px;
-        border-radius: 6px;
-        margin: 10px 0;
-    }
+.stButton>button {
+    background-color: #00e5ff;
+    color: black;
+    border-radius: 8px;
+    border: none;
+    font-weight: bold;
+}
 
-    .inaccurate {
-        background-color: #3b1a0d;
-        border-left: 5px solid #ff9100;
-        padding: 12px;
-        border-radius: 6px;
-        margin: 10px 0;
-    }
-
-    .false {
-        background-color: #3b0d0d;
-        border-left: 5px solid #ff1744;
-        padding: 12px;
-        border-radius: 6px;
-        margin: 10px 0;
-    }
-
-    .unverified {
-        background-color: #1f1f1f;
-        border-left: 5px solid #9e9e9e;
-        padding: 12px;
-        border-radius: 6px;
-        margin: 10px 0;
-    }
-
-    .stButton > button {
-        background-color: #00e5ff;
-        color: black;
-        border-radius: 8px;
-        border: none;
-        padding: 10px 25px;
-        font-weight: bold;
-    }
-
-    .stButton > button:hover {
-        background-color: #00bcd4;
-    }
+.result-box {
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- HEADER ----------------
+# ---------------- TITLE ----------------
 
 st.title("🔍 FactCheck Agent")
-st.markdown("### AI Powered PDF Claim Verification System")
+
+st.markdown("AI-powered PDF fact checking system")
+
 st.markdown("---")
 
 # ---------------- PDF TEXT EXTRACTION ----------------
@@ -107,18 +78,17 @@ def extract_text_from_pdf(pdf_file):
 
 def extract_claims(text):
 
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = f"""
-Extract important factual claims from the following text.
+Extract factual claims from the following text.
 
 Focus on:
 - statistics
-- percentages
 - dates
+- percentages
 - money values
 - scientific claims
-- technical claims
 
 Return ONLY valid JSON array.
 
@@ -126,13 +96,12 @@ Format:
 [
  {{
    "claim": "claim text",
-   "category": "statistic",
-   "context": "short context"
+   "category": "type"
  }}
 ]
 
 TEXT:
-{text[:7000]}
+{text[:6000]}
 """
 
     response = model.generate_content(prompt)
@@ -154,23 +123,20 @@ TEXT:
 
 def verify_claim(claim_obj):
 
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = f"""
-You are a professional fact checker.
+Verify this factual claim.
 
-Verify this claim:
+Claim:
+{claim_obj['claim']}
 
-Claim: "{claim_obj['claim']}"
-
-Respond ONLY in JSON format:
+Return ONLY valid JSON:
 
 {{
-  "verdict": "VERIFIED or INACCURATE or FALSE or UNVERIFIED",
-  "confidence": 90,
-  "explanation": "short explanation",
-  "correct_value": "correct value if wrong",
-  "sources": ["source1", "source2"]
+ "verdict":"VERIFIED or FALSE or INACCURATE",
+ "confidence":"0-100",
+ "explanation":"short explanation"
 }}
 """
 
@@ -189,32 +155,14 @@ Respond ONLY in JSON format:
 
     return result
 
-# ---------------- HELPERS ----------------
-
-def verdict_color(verdict):
-
-    return {
-        "VERIFIED": "verified",
-        "INACCURATE": "inaccurate",
-        "FALSE": "false",
-        "UNVERIFIED": "unverified"
-    }.get(verdict, "unverified")
-
-def verdict_emoji(verdict):
-
-    return {
-        "VERIFIED": "✅",
-        "INACCURATE": "⚠️",
-        "FALSE": "❌",
-        "UNVERIFIED": "❓"
-    }.get(verdict, "❓")
-
-# ---------------- UI ----------------
+# ---------------- FILE UPLOAD ----------------
 
 uploaded_file = st.file_uploader(
     "Upload PDF File",
     type=["pdf"]
 )
+
+# ---------------- MAIN FLOW ----------------
 
 if uploaded_file:
 
@@ -226,7 +174,7 @@ if uploaded_file:
 
     if st.button("🚀 Start Fact Check"):
 
-        # STEP 1
+        # Extract text
 
         with st.spinner("📄 Reading PDF..."):
 
@@ -238,11 +186,11 @@ if uploaded_file:
 
             except Exception as e:
 
-                st.error(f"PDF Error: {e}")
+                st.error(f"PDF extraction failed: {e}")
 
                 st.stop()
 
-        # STEP 2
+        # Extract claims
 
         with st.spinner("🧠 Extracting claims..."):
 
@@ -258,108 +206,47 @@ if uploaded_file:
 
                 st.stop()
 
-        # STEP 3
-
-        results = []
-
-        progress = st.progress(0)
-
-        for i, claim_obj in enumerate(claims):
-
-            try:
-
-                verification = verify_claim(claim_obj)
-
-                results.append({
-                    **claim_obj,
-                    **verification
-                })
-
-            except Exception as e:
-
-                results.append({
-                    **claim_obj,
-                    "verdict": "UNVERIFIED",
-                    "confidence": 0,
-                    "explanation": str(e),
-                    "correct_value": None,
-                    "sources": []
-                })
-
-            progress.progress((i + 1) / len(claims))
-
-        # ---------------- RESULTS ----------------
-
-        st.markdown("---")
-        st.header("📊 Fact Check Results")
-
-        verified = sum(1 for r in results if r["verdict"] == "VERIFIED")
-        inaccurate = sum(1 for r in results if r["verdict"] == "INACCURATE")
-        false_count = sum(1 for r in results if r["verdict"] == "FALSE")
-        unverified = sum(1 for r in results if r["verdict"] == "UNVERIFIED")
-
-        c1, c2, c3, c4 = st.columns(4)
-
-        c1.metric("✅ Verified", verified)
-        c2.metric("⚠️ Inaccurate", inaccurate)
-        c3.metric("❌ False", false_count)
-        c4.metric("❓ Unverified", unverified)
-
         st.markdown("---")
 
-        for r in results:
+        st.header("📊 Verification Results")
 
-            css_class = verdict_color(r["verdict"])
+        # Verify claims
 
-            emoji = verdict_emoji(r["verdict"])
+        for claim_obj in claims:
 
-            with st.expander(f"{emoji} {r['claim'][:80]}"):
+            with st.spinner(f"Checking: {claim_obj['claim'][:50]}..."):
 
-                st.markdown(
-                    f"<div class='{css_class}'>",
-                    unsafe_allow_html=True
-                )
+                try:
 
-                st.markdown(f"### Verdict: {r['verdict']}")
+                    result = verify_claim(claim_obj)
 
-                st.write("**Claim:**")
-                st.write(r["claim"])
+                    verdict = result.get("verdict", "UNKNOWN")
 
-                st.write("**Explanation:**")
-                st.write(r["explanation"])
+                    if verdict == "VERIFIED":
+                        color = "#0d3b1e"
 
-                if r.get("correct_value"):
-                    st.write("**Correct Value:**")
-                    st.write(r["correct_value"])
+                    elif verdict == "FALSE":
+                        color = "#3b0d0d"
 
-                if r.get("sources"):
-                    st.write("**Sources:**")
-                    st.write(", ".join(r["sources"]))
+                    else:
+                        color = "#3b1a0d"
 
-                st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"""
+<div class="result-box" style="background:{color}">
+<h4>{verdict}</h4>
+<p><b>Claim:</b> {claim_obj['claim']}</p>
+<p><b>Explanation:</b> {result.get('explanation')}</p>
+<p><b>Confidence:</b> {result.get('confidence')}</p>
+</div>
+""",
+                        unsafe_allow_html=True
+                    )
 
-        # ---------------- DOWNLOAD REPORT ----------------
+                except Exception as e:
 
-        report_json = json.dumps(results, indent=2)
-
-        st.download_button(
-            "📥 Download JSON Report",
-            data=report_json,
-            file_name="factcheck_report.json",
-            mime="application/json"
-        )
-
-        os.unlink(tmp_path)
+                    st.error(f"Verification failed: {e}")
 
 else:
 
-    st.info("👆 Upload a PDF document to begin fact checking.")
-
-    st.markdown("""
-### Features
-- 📄 PDF Upload
-- 🧠 AI Claim Extraction
-- 🌐 Fact Verification
-- 📊 Truth Report
-- 📥 JSON Download
-""")
+    st.info("Upload a PDF file to begin fact checking.")
