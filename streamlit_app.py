@@ -1,11 +1,15 @@
 import streamlit as st
 import pdfplumber
 import google.generativeai as genai
+import tempfile
 import json
 import re
-import tempfile
 
-# ---------------- PAGE CONFIG ----------------
+# ---------------- API ----------------
+
+genai.configure(api_key="AIzaSyAhdv5yqjxUimjZzK3K8AntW3fqWBm5PBM")
+
+# ---------------- PAGE ----------------
 
 st.set_page_config(
     page_title="FactCheck Agent",
@@ -13,101 +17,56 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---------------- GEMINI API ----------------
-
-GEMINI_API_KEY = "AIzaSyAhdv5yqjxUimjZzK3K8AntW3fqWBm5PBM"
-
-genai.configure(api_key=GEMINI_API_KEY)
-
-# ---------------- CUSTOM CSS ----------------
+# ---------------- CSS ----------------
 
 st.markdown("""
 <style>
 
-html, body, [class*="css"] {
-    font-family: 'Segoe UI', sans-serif;
-}
-
 .stApp {
-    background: linear-gradient(135deg, #0f172a, #111827);
+    background-color: #0f172a;
     color: white;
 }
 
-.main-title {
-    font-size: 48px;
-    font-weight: bold;
-    color: #38bdf8;
-    text-align: center;
-    margin-top: 10px;
+.title {
+    text-align:center;
+    font-size:48px;
+    font-weight:bold;
+    color:#38bdf8;
 }
 
-.sub-title {
-    text-align: center;
-    color: #cbd5e1;
-    font-size: 18px;
-    margin-bottom: 30px;
+.subtitle {
+    text-align:center;
+    color:#cbd5e1;
+    margin-bottom:30px;
 }
 
-.upload-box {
-    background: rgba(255,255,255,0.05);
-    padding: 25px;
-    border-radius: 18px;
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(10px);
+.stButton>button {
+    width:100%;
+    background:#06b6d4;
+    color:white;
+    border:none;
+    border-radius:10px;
+    padding:14px;
+    font-size:18px;
+    font-weight:bold;
 }
 
-.stButton > button {
-    background: linear-gradient(90deg, #06b6d4, #3b82f6);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 14px 28px;
-    font-size: 18px;
-    font-weight: bold;
-    width: 100%;
-    transition: 0.3s;
+.result {
+    padding:20px;
+    border-radius:12px;
+    margin-top:15px;
 }
 
-.stButton > button:hover {
-    transform: scale(1.02);
-    background: linear-gradient(90deg, #0891b2, #2563eb);
+.green {
+    background:#052e16;
 }
 
-.metric-card {
-    background: rgba(255,255,255,0.06);
-    padding: 20px;
-    border-radius: 18px;
-    text-align: center;
-    border: 1px solid rgba(255,255,255,0.08);
+.red {
+    background:#450a0a;
 }
 
-.result-card {
-    padding: 20px;
-    border-radius: 18px;
-    margin-top: 15px;
-    border-left: 6px solid;
-    box-shadow: 0 0 15px rgba(0,0,0,0.3);
-}
-
-.verified {
-    background: rgba(0,255,120,0.08);
-    border-color: #00e676;
-}
-
-.false {
-    background: rgba(255,0,80,0.08);
-    border-color: #ff1744;
-}
-
-.inaccurate {
-    background: rgba(255,170,0,0.08);
-    border-color: #ff9100;
-}
-
-.footer {
-    text-align: center;
-    margin-top: 40px;
-    color: #94a3b8;
+.orange {
+    background:#431407;
 }
 
 </style>
@@ -115,22 +74,16 @@ html, body, [class*="css"] {
 
 # ---------------- HEADER ----------------
 
-st.markdown(
-    """
-<div class="main-title">
-🔍 FactCheck Agent
-</div>
+st.markdown('<div class="title">🔍 FactCheck Agent</div>', unsafe_allow_html=True)
 
-<div class="sub-title">
-AI Powered PDF Fact Verification System
-</div>
-""",
+st.markdown(
+    '<div class="subtitle">AI Powered PDF Fact Verification</div>',
     unsafe_allow_html=True
 )
 
-# ---------------- FUNCTIONS ----------------
+# ---------------- PDF TEXT ----------------
 
-def extract_text_from_pdf(pdf_path):
+def extract_text(pdf_path):
 
     text = ""
 
@@ -141,47 +94,37 @@ def extract_text_from_pdf(pdf_path):
             page_text = page.extract_text()
 
             if page_text:
-                text += page_text + "\n"
+                text += page_text
 
     return text
 
-# ---------------- CLAIM EXTRACTION ----------------
+# ---------------- CLAIMS ----------------
 
 def extract_claims(text):
 
-    model = genai.GenerativeModel(
-        model_name="models/gemini-1.5-flash"
-    )
+    model = genai.GenerativeModel("models/gemini-1.5-flash")
 
     prompt = f"""
 Extract factual claims from this text.
-
-Focus on:
-- dates
-- statistics
-- percentages
-- financial figures
-- scientific claims
 
 Return ONLY valid JSON array.
 
 Example:
 [
  {{
-   "claim":"Tesla was founded in 2003",
-   "category":"date"
+   "claim":"India population is 1.4 billion"
  }}
 ]
 
 TEXT:
-{text[:5000]}
+{text[:4000]}
 """
 
     response = model.generate_content(prompt)
 
     raw = response.text.strip()
 
-    raw = re.sub(r"```json|```", "", raw).strip()
+    raw = re.sub(r"```json|```", "", raw)
 
     match = re.search(r'\[.*\]', raw, re.DOTALL)
 
@@ -192,27 +135,23 @@ TEXT:
 
     return claims
 
-# ---------------- VERIFY CLAIM ----------------
+# ---------------- VERIFY ----------------
 
 def verify_claim(claim):
 
-    model = genai.GenerativeModel(
-        model_name="models/gemini-1.5-flash"
-    )
+    model = genai.GenerativeModel("models/gemini-1.5-flash")
 
     prompt = f"""
-Verify this factual claim.
+Verify this claim:
 
-Claim:
 {claim}
 
-Return ONLY valid JSON.
+Return ONLY valid JSON:
 
-Format:
 {{
  "verdict":"VERIFIED or FALSE or INACCURATE",
- "confidence":"0-100",
- "explanation":"short explanation"
+ "explanation":"short explanation",
+ "confidence":"0-100"
 }}
 """
 
@@ -220,7 +159,7 @@ Format:
 
     raw = response.text.strip()
 
-    raw = re.sub(r"```json|```", "", raw).strip()
+    raw = re.sub(r"```json|```", "", raw)
 
     match = re.search(r'\{.*\}', raw, re.DOTALL)
 
@@ -231,18 +170,12 @@ Format:
 
     return result
 
-# ---------------- UPLOAD SECTION ----------------
-
-st.markdown('<div class="upload-box">', unsafe_allow_html=True)
+# ---------------- UI ----------------
 
 uploaded_file = st.file_uploader(
     "📄 Upload PDF File",
     type=["pdf"]
 )
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# ---------------- MAIN ----------------
 
 if uploaded_file:
 
@@ -254,166 +187,51 @@ if uploaded_file:
 
     if st.button("🚀 Start Fact Check"):
 
-        # PDF Extraction
-
         with st.spinner("📄 Extracting PDF text..."):
 
-            try:
+            text = extract_text(tmp_path)
 
-                pdf_text = extract_text_from_pdf(tmp_path)
-
-                st.success("PDF text extracted successfully")
-
-            except Exception as e:
-
-                st.error(f"PDF extraction failed: {e}")
-
-                st.stop()
-
-        # Claim Extraction
+        st.success("PDF extracted successfully")
 
         with st.spinner("🧠 Extracting claims..."):
 
-            try:
+            claims = extract_claims(text)
 
-                claims = extract_claims(pdf_text)
-
-                st.success(f"{len(claims)} claims extracted")
-
-            except Exception as e:
-
-                st.error(f"Claim extraction failed: {e}")
-
-                st.stop()
+        st.success(f"{len(claims)} claims found")
 
         st.markdown("---")
 
-        verified_count = 0
-        false_count = 0
-        inaccurate_count = 0
-
-        results = []
-
-        # Verification
-
-        for claim_obj in claims:
-
-            claim_text = claim_obj["claim"]
-
-            with st.spinner(f"Checking: {claim_text[:50]}..."):
-
-                try:
-
-                    result = verify_claim(claim_text)
-
-                    verdict = result.get("verdict", "UNKNOWN")
-
-                    if verdict == "VERIFIED":
-                        verified_count += 1
-
-                    elif verdict == "FALSE":
-                        false_count += 1
-
-                    else:
-                        inaccurate_count += 1
-
-                    results.append({
-                        "claim": claim_text,
-                        "result": result
-                    })
-
-                except Exception as e:
-
-                    st.error(f"Verification failed: {e}")
-
-        # ---------------- METRICS ----------------
-
-        st.markdown("## 📊 Report Summary")
-
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-            st.markdown(
-                f"""
-<div class="metric-card">
-<h2>✅ {verified_count}</h2>
-<p>Verified</p>
-</div>
-""",
-                unsafe_allow_html=True
-            )
-
-        with c2:
-            st.markdown(
-                f"""
-<div class="metric-card">
-<h2>❌ {false_count}</h2>
-<p>False</p>
-</div>
-""",
-                unsafe_allow_html=True
-            )
-
-        with c3:
-            st.markdown(
-                f"""
-<div class="metric-card">
-<h2>⚠️ {inaccurate_count}</h2>
-<p>Inaccurate</p>
-</div>
-""",
-                unsafe_allow_html=True
-            )
-
-        st.markdown("---")
-
-        # ---------------- RESULTS ----------------
-
-        st.markdown("## 🔎 Detailed Results")
-
-        for item in results:
+        for item in claims:
 
             claim = item["claim"]
 
-            result = item["result"]
+            with st.spinner(f"Checking: {claim[:40]}"):
 
-            verdict = result.get("verdict", "UNKNOWN")
+                result = verify_claim(claim)
 
-            explanation = result.get("explanation", "")
-
-            confidence = result.get("confidence", "")
+            verdict = result["verdict"]
 
             if verdict == "VERIFIED":
-                card_class = "verified"
+                box = "green"
 
             elif verdict == "FALSE":
-                card_class = "false"
+                box = "red"
 
             else:
-                card_class = "inaccurate"
+                box = "orange"
 
             st.markdown(
-                f"""
-<div class="result-card {card_class}">
+                f'''
+<div class="result {box}">
 <h3>{verdict}</h3>
-
-<p><b>Claim:</b><br>{claim}</p>
-
-<p><b>Explanation:</b><br>{explanation}</p>
-
-<p><b>Confidence:</b> {confidence}</p>
+<p><b>Claim:</b> {claim}</p>
+<p><b>Explanation:</b> {result["explanation"]}</p>
+<p><b>Confidence:</b> {result["confidence"]}</p>
 </div>
-""",
+''',
                 unsafe_allow_html=True
             )
 
-# ---------------- FOOTER ----------------
+else:
 
-st.markdown(
-    """
-<div class="footer">
-Built with Gemini AI • Streamlit • PDF Fact Verification
-</div>
-""",
-    unsafe_allow_html=True
-)
+    st.info("Upload a PDF file to begin.")
