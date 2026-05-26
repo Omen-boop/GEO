@@ -1,16 +1,19 @@
 import streamlit as st
 import pdfplumber
-import google.generativeai as genai
 import json
+import requests
 
-api_key = "AIzaSyDqbRLBY8lODNOTtzLb2I2KjMeiprbHJ7M"
+API_KEY = "AIzaSyDqbRLBY8lODNOTtzLb2I2KjMeiprbHJ7M"
+API_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-2.0-flash:generateContent?key=" + API_KEY
+)
 
-genai.configure(api_key=api_key)
-
-# ── Model — use a current, available model name ──────────────────────────────
-# "gemini-pro" is deprecated; "gemini-1.5-flash" is fast and free-tier friendly.
-MODEL_NAME = "gemini-1.5-flash-latest"
-model = genai.GenerativeModel(MODEL_NAME)
+def call_gemini(prompt):
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    resp = requests.post(API_URL, json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 st.set_page_config(page_title="FactCheck Agent", page_icon="🔍", layout="wide")
 
@@ -70,8 +73,7 @@ def extract_claims(text):
         "Return ONLY a JSON array of strings, no explanation, no markdown.\n\n"
         "Text:\n" + text + "\n\nReturn format: [\"claim 1\", \"claim 2\", ...]"
     )
-    resp = model.generate_content(prompt)
-    raw = resp.text.strip().replace("```json", "").replace("```", "").strip()
+    raw = call_gemini(prompt).strip().replace("```json", "").replace("```", "").strip()
     try:
         return json.loads(raw)
     except Exception:
@@ -88,12 +90,11 @@ def verify_claim(claim):
         '"explanation": "1-2 sentence explanation", '
         '"corrected_fact": "corrected version if FALSE, else null"}'
     )
-    resp = model.generate_content(prompt)
-    raw = resp.text.strip().replace("```json", "").replace("```", "").strip()
+    raw = call_gemini(prompt).strip().replace("```json", "").replace("```", "").strip()
     try:
         return json.loads(raw)
     except Exception:
-        return {"verdict": "UNVERIFIED", "explanation": resp.text[:200], "corrected_fact": None}
+        return {"verdict": "UNVERIFIED", "explanation": raw[:200], "corrected_fact": None}
 
 
 uploaded = st.file_uploader("Upload your PDF document", type=["pdf"])
