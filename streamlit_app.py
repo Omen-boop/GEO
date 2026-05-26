@@ -6,7 +6,7 @@ from duckduckgo_search import DDGS
 st.set_page_config(page_title="AI Fact-Checker", page_icon="🔍")
 st.title("Truth Layer: Automated PDF Fact-Checker")
 
-api_key = st.sidebar.text_input("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", type="password")
+api_key = st.sidebar.text_input("open AI key here ", type="password")
 
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
