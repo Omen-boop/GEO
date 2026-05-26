@@ -9,7 +9,7 @@ genai.configure(api_key=api_key)
 
 # ── Model — use a current, available model name ──────────────────────────────
 # "gemini-pro" is deprecated; "gemini-1.5-flash" is fast and free-tier friendly.
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = "gemini-1.5-flash-latest"
 model = genai.GenerativeModel(MODEL_NAME)
 
 st.set_page_config(page_title="FactCheck Agent", page_icon="🔍", layout="wide")
