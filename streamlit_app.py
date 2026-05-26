@@ -12,7 +12,9 @@ API_URL = (
 def call_gemini(prompt):
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     resp = requests.post(API_URL, json=payload, timeout=60)
-    resp.raise_for_status()
+    if not resp.ok:
+        st.error(f"Gemini API error {resp.status_code}: {resp.text}")
+        st.stop()
     return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 st.set_page_config(page_title="FactCheck Agent", page_icon="🔍", layout="wide")
