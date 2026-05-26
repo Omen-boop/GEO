@@ -3,7 +3,7 @@ import pdfplumber
 import json
 import requests
 
-API_KEY = "AIzaSyDqbRLBY8lODNOTtzLb2I2KjMeiprbHJ7M"
+API_KEY = "AIzaSyBimfsiUtOOGXp5gijqv5W9-_bqqWExiHM"
 API_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     "gemini-2.0-flash:generateContent?key=" + API_KEY
