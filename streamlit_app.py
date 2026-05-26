@@ -3,8 +3,14 @@ import pdfplumber
 import google.generativeai as genai
 import json
 
-genai.configure(api_key="AIzaSyBm5ekx-Mrft2H-5ZxpMC5BOyqb2wAZzCQ")
-model = genai.GenerativeModel("gemini-1.5-flash")
+api_key = "AIzaSyDqbRLBY8lODNOTtzLb2I2KjMeiprbHJ7M"
+
+genai.configure(api_key=api_key)
+
+# ── Model — use a current, available model name ──────────────────────────────
+# "gemini-pro" is deprecated; "gemini-1.5-flash" is fast and free-tier friendly.
+MODEL_NAME = "gemini-1.5-flash"
+model = genai.GenerativeModel(MODEL_NAME)
 
 st.set_page_config(page_title="FactCheck Agent", page_icon="🔍", layout="wide")
 
