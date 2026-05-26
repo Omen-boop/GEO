@@ -49,7 +49,7 @@ def extract_text_from_pdf(pdf_file):
 
 
 def extract_claims(text):
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-pro")
     prompt = f"""You are a fact-extraction expert. Extract all verifiable factual claims from this document.
 Focus on: statistics, percentages, dates, numbers, named entities, financial figures, technical claims, scientific claims.
 
